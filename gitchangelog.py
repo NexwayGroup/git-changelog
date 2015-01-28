@@ -79,11 +79,24 @@ def generate_tag_list(options):
     :param options: Program options.
     :return: Filtered tag list.
     """
-    # Get the tag description. Split the lines, remove the last empty line.
-    all_tags = subprocess.check_output(["git", "tag"]).split(b'\n')[:-1]
+
+    # This uses http://stackoverflow.com/questions/18659959/git-tag-in-chronological-order solution
+    # to list tags in chronological order
+    
+    p1 = subprocess.Popen(['git', 'tag'], stdout=subprocess.PIPE)
+    p2 = subprocess.Popen(['xargs', '-I@', 'git', 'log','--format=format:"%ai @%n"', '-1', '@'], stdin=p1.stdout, stdout=subprocess.PIPE)
+    p3 = subprocess.Popen(['sort'], stdin=p2.stdout, stdout=subprocess.PIPE)
+    p4 = subprocess.Popen(['awk', "{print $4}"], stdin=p3.stdout, stdout=subprocess.PIPE)
+
+    p1.stdout.close()
+    p2.stdout.close()
+    p3.stdout.close()
+
+    # Delete leading and trailing newlines from output
+    all_tags = p4.communicate()[0].split(b'\n')[1:][:-1]
 
     if is_list_all(options):
-        tags = sorted(all_tags)[::-1]
+        tags = all_tags[::-1]
     else:
         # The above list only gives us a list of all tags. We are interested in
         # the correct order in the repo and only the tags that are on the
@@ -135,7 +148,7 @@ def generate_changelog(tags, outfile):
 
             # Print the tag name.
             elif i == 2:
-                outfile.write(line[4:]+b"\n")
+                outfile.write(b"##"+line[4:]+b"\n")
 
 
 def is_list_all(options):
